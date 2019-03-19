@@ -1,0 +1,47 @@
+http://www.centoscn.com/CentOS/config/2015/0328/5030.html
+
+wget http://mirrors.163.com/centos/6/os/x86_64/Packages/python-iniparse-0.3.1-2.1.el6.noarch.rpm
+
+wget http://mirrors.163.com/centos/6/os/x86_64/Packages/yum-metadata-parser-1.1.2-16.el6.x86_64.rpm
+
+wget http://mirrors.163.com/centos/6/os/x86_64/Packages/yum-cron-3.2.29-73.el6.centos.noarch.rpm
+
+wget http://mirrors.163.com/centos/6/os/x86_64/Packages/yum-plugin-fastestmirror-1.1.30-37.el6.noarch.rpm
+
+--yum 排查错
+http://blog.csdn.net/sfdst/article/details/52056647
+
+之后：
+
+yum-config-manager --disable addons
+yum clean  all 
+yum makecache 
+
+
+
+yum install gcc-c++ --nogpgcheck
+yum install pcre pcre-devel  
+yum install zlib zlib-devel
+yum install openssl openssl--devel
+yum -y install pcre-devel openssl openssl-devel
+
+find -name nginx  
+yum remove nginx 
+cd /usr/local  
+wget http://nginx.org/download/nginx-1.7.4.tar.gz
+ tar -zxvf nginx-1.7.4.tar.gz  
+ cd  nginx-1.7.4
+  ./configure   
+  
+make
+make install 
+
+ whereis nginx 
+
+之后再给添加自启动
+
+
+nano /etc/security/limits.conf  --修改系统最大连接数
+追加：
+* soft nofile 32768
+* hard nofile 51200

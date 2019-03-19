@@ -1,0 +1,151 @@
+cd /usr
+wget https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-6.6.2.tar.gz
+wget https://artifacts.elastic.co/downloads/logstash/logstash-6.6.2.tar.gz
+wget https://artifacts.elastic.co/downloads/kibana/kibana-6.6.2-linux-x86_64.tar.gz
+
+tar -xf elasticsearch-6.6.2.tar.gz -C /usr/local
+mv /usr/local/elasticsearch-6.6.2 /usr/local/elasticsearch
+cd /usr/local/elasticsearch/config
+nano /usr/local/elasticsearch/config/elasticsearch.yml
+
+
+cluster.name: myescluster         #自定义修改一个集群名称
+node.name: node112                 #节点名称
+network.host: 0.0.0.0      #节点IP（或者解析的主机名）
+#network.bind_host: 0.0.0.0
+bootstrap.memory_lock: true          #设置elasticsearch的进程锁住内存
+#discovery.zen.ping.unicast.hosts: ["192.168.136.112", "192.168.136.111"]  #集群个节点IP地址                 
+#discovery.zen.minimum_master_nodes: 1      #为了避免脑裂，集群节点数最少为 半数+1
+
+#数据目录
+path.data:  /usr/local/elasticsearch/data
+#log目录
+path.logs:  /usr/local/elasticsearch/logs
+#默认的端口号以及访问
+http.port: 9200
+http.cors.enabled: true
+http.cors.allow-origin: "*"
+
+nano /usr/local/elasticsearch/config/jvm.options
+
+-Xms256m
+-Xmx256m
+
+
+systemctl status iptables.service
+nano /etc/sysconfig/iptables
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 9100 -j ACCEPT
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 9200 -j ACCEPT
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 9300 -j ACCEPT
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 5601 -j ACCEPT
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 5044 -j ACCEPT
+systemctl start iptables.service
+
+service iptables status
+service iptables stop
+service iptables start
+
+--------插件
+yum install git nodejs npm
+
+wget https://nodejs.org/dist/v10.15.3/node-v10.15.3-linux-x64.tar.xz
+xz -d node-v10.15.3-linux-x64.tar.xz
+tar xvf node-v10.15.3-linux-x64.tar -C /usr/local/nodejs
+
+export NODE_HOME=/usr/local/nodejs/node-v10.15.3-linux-x64
+export PATH=$NODE_HOME/bin:$PATH
+---环境变量生效
+source /etc/profile
+
+cd /usr/local/elasticsearch
+git clone git://github.com/mobz/elasticsearch-head.git
+npm install -g cnpm --registry=https://registry.npm.taobao.org
+cd elasticsearch-head/
+nano Gruntfile.js
+
+
+在connect属性中，增加hostname: ‘0.0.0.0’
+      connect: {
+                        server: {
+                                options: {
+                                        hostname: '0.0.0.0',
+                                        port: 9100,
+                                        base: '.',
+                                        keepalive: true
+
+										
+nano _site/app.js
+
+[admin@node21 _site]$ vi app.js 
+this.base_uri = this.config.base_uri || this.prefs.get("app-base_uri") || "http://localhost:9200";
+把localhost修改成你es的服务器地址，如:
+this.base_uri = this.config.base_uri || this.prefs.get("app-base_uri") || "http://192.168.136.112:9200";	
+										
+npm install -g grunt
+										
+
+										
+										
+------启动	
+
+groupadd elsearch
+useradd elsearch -g elsearch -p clare            #useradd [user name] -g [group name] -p [password]
+
+chown -R elsearch:elsearch  /usr/local/elasticsearch               #chown -R [user name:group name] 该用户所分配有权限的目录    更改elasticsearch文件夹及内部文件的所属用户及组为elsearch:elsearch
+
+
+nano /etc/security/limits.conf 
+elsearch soft memlock unlimited
+elsearch hard memlock unlimited
+
+* soft nofile 65536
+* hard nofile 131072
+* soft nproc 2048
+* hard nproc 4096
+
+nano /etc/sysctl.conf 
+vm.swappiness=0
+vm.max_map_count=655360
+
+nano /etc/security/limits.d/20-nproc.conf 
+
+* soft nproc 4096
+
+sysctl -p
+
+
+
+su elsearch
+
+
+cd /usr/local/elasticsearch/bin
+./elasticsearch -d
+
+
+netstat -tunlp 
+
+
+tar -xf logstash-6.6.2.tar.gz -C /usr/local
+mv /usr/local/logstash-6.6.2 /usr/local/logstash
+cd /usr/local/logstash/config
+
+
+tar -xf kibana-6.6.2-linux-x86_64.tar.gz -C /usr/local
+mv /usr/local/kibana-6.6.2-linux-x86_64 /usr/local/kibana
+cd /usr/local/kibana/config
+
+
+server.port: 5601
+server.host: "192.168.136.112"   #设置自己机器的IP
+elasticsearch.hosts: ["http://192.168.136.112:9200"]
+
+cd /usr/local/kibana/bin
+ ./kibana &
+ nohup ../bin/kibana &
+ 
+ ps -ef  | grep elasticsearch
+ 
+ fuser -n tcp 5601
+ 
+ kill -9 15871
+

@@ -1,0 +1,198 @@
+yum install erlang
+
+yum -y install ncurses-devel
+
+wget http://www.erlang.org/download/otp_src_19.1.tar.gz     ---------时间长
+
+tar -xzvf otp_src_19.1.tar.gz
+cd otp_src_19.1
+./configure --prefix=/opt/erlang
+make && make install
+
+cd /opt/erlang/
+
+nano /etc/profile
+加入：
+#set erlang environment
+export PATH=$PATH:/opt/erlang/bin
+
+source  /etc/profile     --使得文件生效
+
+erl
+halt().
+
+wget http://www.rabbitmq.com/releases/rabbitmq-server/v3.6.5/rabbitmq-server-generic-unix-3.6.5.tar.xz
+xz -d rabbitmq-server-generic-unix-3.6.5.tar.xz
+tar -xvf rabbitmq-server-generic-unix-3.6.5.tar -C /opt
+
+mv rabbitmq_server-3.6.5 rabbitmq
+
+nano /etc/profile
+加入：
+#set rabbitmq environment
+export PATH=$PATH:/opt/rabbitmq/sbin
+source  /etc/profile
+
+ cd sbin/
+rabbitmq-server start
+rabbitmqctl status
+rabbitmqctl stop
+
+
+mkdir /etc/rabbitmq
+./rabbitmq-plugins enable rabbitmq_management
+
+
+http://localhost:15672
+默认用户guest 密码guest
+
+http://192.168.22.115:15672/#/
+
+
+命令：firewall-cmd --zone=public --add-port=15672/tcp --permanent（开放80端口）
+
+命令：systemctl restart firewalld（重启防火墙以使配置即时生效）
+
+　　
+
+
+http://www.linuxidc.com/Linux/2016-03/129557.htm
+https://segmentfault.com/a/1190000004627137
+
+
+
+
+
+
+
+
+
+------------------------------------------------------------------方式2 集群
+192.168.1.115，192.168.1.116：
+yum -y install ncurses-devel
+cd usr
+wget http://www.erlang.org/download/otp_src_19.2.tar.gz 
+tar -xzvf otp_src_19.2.tar.gz
+cd otp_src_19.2
+./configure --prefix=/usr/erlang
+make && make install
+
+cd /usr/erlang/
+
+nano /etc/profile
+加入：
+#set erlang environment
+export PATH=$PATH:/usr/erlang/bin
+
+source  /etc/profile     --使得文件生效
+
+erl
+halt().
+
+cd /usr
+wget http://www.rabbitmq.com/releases/rabbitmq-server/v3.6.6/rabbitmq-server-generic-unix-3.6.6.tar.xz
+xz -d rabbitmq-server-generic-unix-3.6.6.tar.xz
+tar -xvf rabbitmq-server-generic-unix-3.6.6.tar -C /usr
+
+mv rabbitmq_server-3.6.6 rabbitmq
+
+nano /etc/profile
+加入：
+#set rabbitmq environment
+export PATH=$PATH:/usr/rabbitmq/sbin
+source  /etc/profile
+
+
+ping host1
+
+nano /etc/sysconfig/iptables
+# 增加一下内容
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 15672 -j ACCEPT
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 25672 -j ACCEPT
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 4369 -j ACCEPT
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 5672 -j ACCEPT
+service iptables restart
+
+mkdir /etc/rabbitmq
+nano /etc/rabbitmq/rabbitmq-env.conf
+#加入
+RABBITMQ_MNESIA_BASE=/usr/rabbitmq/data        //需要使用的MNESIA数据库的路径
+RABBITMQ_LOG_BASE=/usr/rabbitmq/log        //log的路径
+RABBITMQ_PLUGINS_DIR=/usr/rabbitmq/plugins    //插件的路径
+
+ cd /usr/rabbitmq/sbin
+rabbitmq-server start
+rabbitmqctl status
+rabbitmqctl stop
+
+
+/usr/rabbitmq/sbin/rabbitmq-plugins list 查看插件列表
+/usr/rabbitmq/sbin/rabbitmq-plugins enable rabbitmq_management  (启用插件)
+/usr/rabbitmq/sbin/rabbitmq-plugins disable rabbitmq_management (禁用插件)
+
+#加用户
+rabbitmqctl add_user admin admin
+rabbitmqctl set_user_tags admin administrator
+rabbitmqctl set_permissions -p / admin '.*' '.*' '.*'
+
+http://192.168.1.115:15672
+http://192.168.1.116:15672
+
+
+#查看home，好复制erlang cookie,并将2个cookie配成一样的
+echo $HOME
+cd /root
+chmod u+w .erlang.cookie
+nano .erlang.cookie
+
+#修改hostname 115 116 为db1，db2
+hostnamectl 
+hostnamectl set-hostname db1
+
+nano /etc/sysconfig/network
+加入
+NETWORKING=yes
+HOSTNAME= db1
+
+nano /etc/hosts
+#加入：
+127.0.0.1   localhost db1 localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+192.168.1.115   db1
+192.168.1.116   db2
+ 
+ 
+
+#之后 192.168.1.115
+cd /usr/rabbitmq/sbin
+rabbitmq-server -detached
+
+#之后 192.168.1.116
+cd /usr/rabbitmq/sbin
+rabbitmq-server -detached
+rabbitmqctl stop_app
+rabbitmqctl join_cluster --ram rabbit@db1
+rabbitmqctl start_app
+
+#之后192.168.1.115 192.168.1.116 都执行
+cd /usr/rabbitmq/sbin
+rabbitmqctl set_policy -p / ha-allqueue "^" '{"ha-mode":"all"}'
+
+rabbitmqctl cluster_status
+rabbitmqctl  list_users 
+
+
+
+# 192.168.1.115
+cd /usr/rabbitmq/sbin
+rabbitmq-server -detached
+
+# 192.168.1.116
+cd /usr/rabbitmq/sbin
+rabbitmq-server -detached
+
+
+#资料
+http://www.cnblogs.com/lylife/p/5584019.html
+http://mp.weixin.qq.com/s?__biz=MzAxNzMwOTQ0NA%3D%3D&mid=2653354780&idx=4&sn=e3604ae664e29d3f49c34ea911a6c7dd&chksm=8035d177b74258615ee8f264af61e7e819da2d0751208f012594f6f2835b2f17fc65f5a99ed8
+http://blog.csdn.net/cjfeii/article/details/50728069

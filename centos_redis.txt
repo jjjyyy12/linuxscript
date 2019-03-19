@@ -1,0 +1,269 @@
+yum install gcc
+
+firewall-cmd --zone=public --add-port=7000-7005/tcp --permanent
+firewall-cmd --reload
+
+cd /usr/local
+wget http://download.redis.io/releases/redis-3.2.0.tar.gz
+tar -zxvf redis-3.2.0.tar.gz
+cd redis-3.2.0/
+mkdir  -p /usr/local/rediscluster
+make install PREFIX=/usr/local/rediscluster
+cp redis.conf  /usr/local/rediscluster
+cd /usr/local/rediscluster
+mv bin/  7000
+cp -rf 7000 7001
+cp -rf 7000 7002
+cp -rf 7000 7003
+cp -rf 7000 7004
+cp -rf 7000 7005
+
+nano redis.conf
+
+--搜索替换下列配置，不是全部替换，有时启动不了是conf原因，就把下面内容写入。。即可
+port 7000
+protected-mode no
+bind 192.168.1.111
+daemonize    yes
+pidfile  /var/run/redis_7000.pid
+cluster-enabled yes
+cluster-config-file nodes.conf
+logfile "/var/log/redisd7000.log"
+dir /usr/local/rediscluster/7000/
+cluster-node-timeout 5000
+
+#rdb配置
+################################ SNAPSHOTTING  #################################
+# Save the DB on disk:
+#  设置sedis进行数据库镜像的频率。
+#  900秒（15分钟）内至少1个key值改变（则进行数据库保存--持久化）。
+#  300秒（5分钟）内至少10个key值改变（则进行数据库保存--持久化）。
+#  60秒（1分钟）内至少10000个key值改变（则进行数据库保存--持久化）。
+#save 900 1
+#save 300 10
+#save 60 10000
+
+#stop-writes-on-bgsave-error yes
+# 在进行镜像备份时,是否进行压缩。yes：压缩，但是需要一些cpu的消耗。no：不压缩，需要更多的磁盘空间。
+#rdbcompression yes
+# 一个CRC64的校验就被放在了文件末尾，当存储或者加载rbd文件的时候会有一个10%左右的性能下降，为了达到性能的最大化，你可以关掉这个配置项。
+#rdbchecksum yes
+# 快照的文件名
+#dbfilename dump.rdb
+# 存放快照的目录
+#dir /var/lib/redis
+
+#aof 配置
+#appendonly yes
+#appendfilename zhoujy.aof
+# appendfsync always
+#appendfsync everysec
+# appendfsync no
+#no-appendfsync-on-rewrite no
+#auto-aof-rewrite-min-size 64mb
+
+cp redis.conf  7000/redis.conf
+cp redis.conf  7001/redis.conf
+cp redis.conf  7002/redis.conf
+cp redis.conf  7003/redis.conf
+cp redis.conf  7004/redis.conf
+cp redis.conf  7005/redis.conf
+nano 7000/redis.conf
+nano 7001/redis.conf
+nano 7002/redis.conf
+nano 7003/redis.conf
+nano 7004/redis.conf
+nano 7005/redis.conf
+
+yum install ruby
+yum install rubygems
+yum -y install ruby ruby-devel rubygems rpm-build 
+gem install redis
+
+cd /usr/local/rediscluster/7000
+./redis-server redis.conf &
+cd /usr/local/rediscluster/7001
+./redis-server redis.conf &
+cd /usr/local/rediscluster/7002
+./redis-server redis.conf &
+cd /usr/local/rediscluster/7003
+./redis-server redis.conf &
+cd /usr/local/rediscluster/7004
+./redis-server redis.conf &
+cd /usr/local/rediscluster/7005
+./redis-server redis.conf &
+
+ps -ef|grep redis
+netstat -tnlp | grep redis
+
+cd /usr/local/redis-3.2.0/src
+
+-- --replicas  1  表示 自动为每一个master节点分配一个slave节点 
+./redis-trib.rb create --replicas 1 192.168.73.128:7000 192.168.73.128:7001 192.168.73.128:7002 192.168.73.128:7003 192.168.73.128:7004 192.168.73.128:7005
+./redis-trib.rb create --replicas 1 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002 127.0.0.1:7003 127.0.0.1:7004 127.0.0.1:7005
+./redis-trib.rb create --replicas 1 192.168.1.111:7000 192.168.1.111:7001 192.168.1.111:7002 192.168.1.111:7003 192.168.1.111:7004 192.168.1.111:7005
+./redis-trib.rb create --replicas 1 172.16.32.184:7000 172.16.32.184:7001 172.16.32.184:7002 172.16.32.184:7003 172.16.32.184:7004 172.16.32.184:7005
+./redis-trib.rb create --replicas 1 172.16.32.139:7000 172.16.32.139:7001 172.16.32.139:7002 172.16.32.139:7003 172.16.32.139:7004 172.16.32.139:7005
+
+cd /usr/local/redis-3.2.0/src 
+
+./redis-trib.rb check 172.16.32.184:7000
+
+./redis-cli -c -h 172.16.32.184 -p 7000          --测试连接,-c 集群模式
+ CLUSTER SLOTS  --连接后看操
+ CLUSTER info
+ CLUSTER nodes
+./redis-cli -c -p 7000
+
+./redis-cli -c -p 7001
+
+ZRANGEBYSCORE clare_javaUsere20af586-bca7-42bd-efa1-08d411e2b01c -inf +inf 
+-----------------------------开机自启动
+cp /usr/local/redis-3.2.0/utils/redis_init_script /etc/init.d/redisd7000
+nano /etc/init.d/redisd7000
+
+#!/bin/sh
+#chkconfig:    2345 90 10
+#description:  Redis is a persistent key-value database
+# Simple Redis init.d script conceived to work on Linux systems
+# as it does use of the /proc filesystem.
+REDISHOST=192.168.1.111
+REDISPORT=7000
+#EXEC=/usr/local/bin/redis-server
+EXEC=/usr/local/rediscluster/${REDISPORT}/redis-server
+CLIEXEC=/usr/local/redis-3.2.0/src/redis-cli
+
+PIDFILE=/var/run/redis_${REDISPORT}.pid
+CONF="/usr/local/rediscluster/${REDISPORT}/redis.conf"
+
+case "$1" in
+    start)
+	if [ -f $PIDFILE ]
+        then
+            	echo "$PIDFILE exists, process is already running or crashed"
+        else
+            	echo "Starting Redis server..."
+                $EXEC $CONF
+        fi
+	;;
+    stop)
+	if [ ! -f $PIDFILE ]
+        then
+            	echo "$PIDFILE does not exist, process is not running"
+        else
+            	PID=$(cat $PIDFILE)
+                echo "Stopping ..."
+                $CLIEXEC -h $REDISHOST -p $REDISPORT shutdown
+                while [ -x /proc/${PID} ]
+                do
+                    echo "Waiting for Redis to shutdown ..."
+                    sleep 1
+                done
+                echo "Redis stopped"
+        fi
+	;;
+    *)
+      	echo "Please use start or stop as first argument"
+        ;;
+esac
+
+chmod +x /etc/init.d/redisd7000 
+ 
+chkconfig --add redisd7000
+
+systemctl enable redisd7000.service
+nano /etc/rc.local
+加入 /etc/init.d/redisd7000 start  
+
+service redisd7000 start
+service redisd7000 stop
+
+其他端口同7000
+
+
+------------换ip
+#更改ip，5个地方
+nano /etc/init.d/redisd7000
+nano /usr/local/rediscluster/7000/redis.conf
+#5个
+cp rediscluster/7000/redis.conf redisconfig_backup/redis0.conf  
+cp rediscluster/7001/redis.conf redisconfig_backup/redis1.conf
+cp rediscluster/7002/redis.conf redisconfig_backup/redis2.conf
+cp rediscluster/7003/redis.conf redisconfig_backup/redis3.conf
+cp rediscluster/7004/redis.conf redisconfig_backup/redis4.conf
+cp rediscluster/7005/redis.conf redisconfig_backup/redis5.conf
+ #5个
+service redisd7000 stop
+service redisd7001 stop
+service redisd7002 stop
+service redisd7003 stop
+service redisd7004 stop
+service redisd7005 stop
+cd /usr/local
+
+mv redis-3.2.0 redis-3.2.0_1
+mv rediscluster rediscluster_1
+
+#接下来重装。。。参照上面
+
+#装完考培config
+cp /usr/local/redisconfig_backup/redis0.conf /usr/local/rediscluster/7000/redis.conf
+cp /usr/local/redisconfig_backup/redis1.conf /usr/local/rediscluster/7001/redis.conf
+cp /usr/local/redisconfig_backup/redis2.conf /usr/local/rediscluster/7002/redis.conf
+cp /usr/local/redisconfig_backup/redis3.conf /usr/local/rediscluster/7003/redis.conf
+cp /usr/local/redisconfig_backup/redis4.conf /usr/local/rediscluster/7004/redis.conf
+cp /usr/local/redisconfig_backup/redis5.conf /usr/local/rediscluster/7005/redis.conf
+
+#删老的文件
+cd /usr/local
+rm -rf rediscluster_1
+rm -rf redis-3.2.0_1
+
+#之后
+cd /usr/local/rediscluster/7000
+./redis-server redis.conf &
+cd /usr/local/rediscluster/7001
+./redis-server redis.conf &
+cd /usr/local/rediscluster/7002
+./redis-server redis.conf &
+cd /usr/local/rediscluster/7003
+./redis-server redis.conf &
+cd /usr/local/rediscluster/7004
+./redis-server redis.conf &
+cd /usr/local/rediscluster/7005
+./redis-server redis.conf &
+
+netstat -tnlp | grep redis
+
+#之后创建集群
+cd /usr/local/redis-3.2.0/src
+./redis-trib.rb create --replicas 1 172.23.160.198:7000 172.23.160.198:7001 172.23.160.198:7002 172.23.160.198:7003 172.23.160.198:7004 172.23.160.198:7005
+
+
+./redis-cli -c -h 172.16.32.184 -p 7000
+CLUSTER INFO
+CLUSTER nodes
+
+7f1e5633ffe9b7825c2e5479a1de5aea07810307 192.168.22.115:7000 slave,fail? 15f03bed2ff6dbe7d6d0fe3700087461b9ffe011 1486691108993 1486691108925 7 connected
+c1b2796da1313efdc7ae83494d6be1dea8e74c12 192.168.22.115:7002 master,fail? - 1486691108993 1486691108925 9 connected 10923-16383
+dc2c90e86f1aad5b11b1f68623f96af2b201dedb 192.168.22.115:7001 myself,master - 0 0 2 connected 5461-10922
+15f03bed2ff6dbe7d6d0fe3700087461b9ffe011 192.168.22.115:7003 master,fail? - 1486691108993 1486691108925 7 connected 0-5460
+06421ef875b35ab7fe4d8f6433b10c53bb13871e 192.168.22.115:7005 slave,fail? c1b2796da1313efdc7ae83494d6be1dea8e74c12 1486691108993 1486691108925 9 connected
+5b4b2be9d726f26a8a0bea93bbcb509d92dc3aed 192.168.22.115:7004 slave,fail? dc2c90e86f1aad5b11b1f68623f96af2b201dedb 1486691108994 1486691108925 5 connected
+
+
+CLUSTER FORGET 7f1e5633ffe9b7825c2e5479a1de5aea07810307
+CLUSTER FORGET c1b2796da1313efdc7ae83494d6be1dea8e74c12
+CLUSTER FORGET 15f03bed2ff6dbe7d6d0fe3700087461b9ffe011
+CLUSTER FORGET 06421ef875b35ab7fe4d8f6433b10c53bb13871e
+CLUSTER FORGET 5b4b2be9d726f26a8a0bea93bbcb509d92dc3aed
+CLUSTER FORGET dc2c90e86f1aad5b11b1f68623f96af2b201dedb
+cd /usr/local/redis-3.2.0/src
+
+./redis-trib.rb del-node 192.168.22.115:7000 7f1e5633ffe9b7825c2e5479a1de5aea07810307
+
+
+./redis-trib.rb create --replicas 1 172.16.32.184:7000 172.16.32.184:7001 172.16.32.184:7002 172.16.32.184:7003 172.16.32.184:7004 172.16.32.184:7005
+
+
+http://blog.csdn.net/dgatiger/article/details/50428221

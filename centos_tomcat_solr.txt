@@ -1,0 +1,197 @@
+﻿#https://www.2cto.com/net/201703/614219_2.html
+#http://blog.csdn.net/u014793522/article/details/51363210
+
+cd /usr/local
+
+wget https://mirrors.tuna.tsinghua.edu.cn/apache/tomcat/tomcat-8/v8.0.47/bin/apache-tomcat-8.0.47.tar.gz
+tar zvxf apache-tomcat-8.0.47.tar.gz
+mkdir solrcloud
+cd solrcloud
+mkdir tomcat1
+ 
+
+cp -ri /usr/local/apache-tomcat-8.0.47/* /usr/local/solrcloud/tomcat1/
+
+
+nano /usr/local/solrcloud/tomcat1/conf/server.xml  
+#修改端口为18081
+    <Connector port="18081" protocol="HTTP/1.1"
+               connectionTimeout="20000"
+               redirectPort="8443" />
+
+cd /usr/local
+ wget http://mirrors.hust.edu.cn/apache/lucene/solr/5.5.5/solr-5.5.5.tgz
+ tar zxvf solr-5.5.5.tgz
+ 
+ ----------------------------------------------
+ 
+ cp -r /usr/local/solr-5.5.5/server/solr-webapp/webapp /usr/local/solrcloud/tomcat1/webapps/solr
+
+nano /etc/sysconfig/iptables
+# 增加一下内容
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 18081 -j ACCEPT
+service iptables restart
+
+mkdir /usr/local/solrcloud/solr_home1
+cp -r  /usr/local/solr-5.5.5/server/solr/*  /usr/local/solrcloud/solr_home1
+nano /usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/web.xml
+#solrhome路径改为/usr/local/solrcloud/solr_home1
+
+cp -r  /usr/local/solr-5.5.5/server/lib/ext/*  /usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/lib
+mkdir /usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/classpath
+cp  /usr/local/solr-5.5.5/server/resources/log4j.properties /usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/classpath
+
+#运行tomcat
+cd /usr/local/solrcloud/tomcat1/bin
+./startup.sh
+
+--查看tomcat进程
+ps -ef |grep tomcat
+kill -9
+
+##core
+cd /usr/local/solr-5.5.5/example/example-DIH/solr
+cp -r solr  /usr/local/solrcloud/solr_home1/core01
+nano /usr/local/solrcloud/solr_home1/core01/conf/solrconfig.xml
+#注释掉dataimport
+
+nano /usr/local/solrcloud/solr_home1/core01/core.properties
+#加入 name=authcore1
+
+cd /usr/local/solrcloud/tomcat1/bin
+./shutdown.sh
+./startup.sh
+#./catalina.sh run
+tail -100  catalina.out
+
+#####################################查看启动的日志，前提是把log4j.properties考到了 /usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/classpath，或/usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/classes
+#####################################查看启动的日志，前提是把log4j.properties考到了 /usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/classpath，或/usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/classes
+#####################################查看启动的日志，前提是把log4j.properties考到了 /usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/classpath，或/usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/classes
+tail -100 ../logs/catalina.out
+ 
+ 
+ 
+###############################################################################################################
+null:org.apache.solr.common.SolrException: Found multiple cores with the name [CareerQuestion], with instancedirs [/usr/solr-4.10.1/example/solr/CareerQuestion/] and [/usr/solr-4.10.1/example/solr/CareerQuestionQA/]
+        at org.apache.solr.core.CoreContainer.checkForDuplicateCoreNames(CoreContainer.java:297)
+        at org.apache.solr.core.CoreContainer.load(CoreContainer.java:241)
+        at org.apache.solr.servlet.SolrDispatchFilter.createCoreContainer(SolrDispatchFilter.java:189)
+        at org.apache.solr.servlet.SolrDispatchFilter.init(SolrDispatchFilter.java:136)
+        at org.apache.catalina.core.ApplicationFilterConfig.initFilter(ApplicationFilterConfig.java:279)
+        at org.apache.catalina.core.ApplicationFilterConfig.getFilter(ApplicationFilterConfig.java:260)
+        at org.apache.catalina.core.ApplicationFilterConfig.<init>(ApplicationFilterConfig.java:105)
+        at org.apache.catalina.core.StandardContext.filterStart(StandardContext.java:4854)
+        at org.apache.catalina.core.StandardContext.startInternal(StandardContext.java:5542)
+        at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:150)
+        at org.apache.catalina.core.ContainerBase.addChildInternal(ContainerBase.java:901)
+        at org.apache.catalina.core.ContainerBase.addChild(ContainerBase.java:877)
+        at org.apache.catalina.core.StandardHost.addChild(StandardHost.java:649)
+        at org.apache.catalina.startup.HostConfig.deployWAR(HostConfig.java:1081)
+        at org.apache.catalina.startup.HostConfig$DeployWar.run(HostConfig.java:1877)
+        at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:511)
+        at java.util.concurrent.FutureTask.run(FutureTask.java:266)
+        at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1142)
+        at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:617)
+        at java.lang.Thread.run(Thread.java:745)
+	
+ 
+ 
+ ps -ef |grep zookeeper
+ kill -9
+ 
+ 卓聘验收solr：
+ 192.168.201.191  192.168.201.192 192.168.201.193
+ /usr/local/solrcloud/zookeeper/bin/zkServer.sh start
+ /usr/local/solrcloud/solr/apache-tomcat-7.0.59/bin/startup.sh
+ 
+ 
+ 
+cd /usr/local/solr-5.5.5/server/scripts/cloud-scripts
+./zkcli.sh -zkhost 192.168.1.115:12181,192.168.1.116:12181 -cmd upconfig -confdir /usr/local/solrcloud/solr_home1/core01/conf -confname solr1conf
+
+去任意一个zookeeper的bin目录运行zkCleanup.sh查看配置文件是否上传成功
+
+
+查看 zookeeper目录下有没有此文件  
+cd /usr/local/zookeeper-3.4.8/bin/
+./zkCli.sh -server 192.168.1.115:12181
+ls /configs
+
+
+nano /usr/local/solrcloud/solr_home1/solr.xml
+
+#<str name="host">${host:192.168.1.115}</str>
+#    <int name="hostPort">${jetty.port:18081}</int>
+
+nano /usr/local/solrcloud/tomcat1/bin/catalina.sh
+内容行第二行加入JAVA_OPTS="-DzkHost=192.168.1.115:12181,192.168.1.116:12181"
+
+#修改SolrCloud监控端口,修改每个solrhome的solr.xml文件。告诉它们监控他们自己的地址，它们tomcat对应的地址
+
+修改每一台solr的tomcat 的 bin目录下catalina.sh文件中加入DzkHost指定zookeeper服务器地址：
+
+JAVA_OPTS="-DzkHost=192.168.1.115:12181,192.168.1.116:12181"
+
+(可以使用vim的查找功能查找到JAVA_OPTS的定义的位置，然后添加)
+
+
+#查看端口坚挺情况
+lsof -i
+
+http://192.168.1.115:18081/solr/admin.html#/
+http://192.168.1.115:18081/solr/admin.html#/-cloud
+
+http://192.168.1.115:18081/solr/authcore1/schema?wt=json
+http://192.168.1.115:18081/solr/authcore1/schema/fields?wt=json
+
+documents：
+{"userid":"226b44f4-9afc-4dbd-d2c6-08d40ad7befc","username":"admin","password":"123456","departmentid":"69317b55-5a42-4d89-873e-2a2e1c4aaa5e"}
+
+
+#修改字段：
+nano /usr/local/solrcloud/solr_home1/core01/conf/managed-schema
+加入field：depid
+
+
+
+
+
+
+节点二同一：
+
+cd /usr/local
+mkdir tomcat2
+cp -ri /usr/local/apache-tomcat-8.0.47/* /usr/local/solrcloud/tomcat2/
+ cp -r /usr/local/solr-5.5.5/server/solr-webapp/webapp /usr/local/solrcloud/tomcat2/webapps/solr
+ nano /usr/local/solrcloud/tomcat2/conf/server.xml  
+#修改端口为18082
+
+mkdir /usr/local/solrcloud/solr_home2
+cp -r  /usr/local/solr-5.5.5/server/solr/*  /usr/local/solrcloud/solr_home2
+nano /usr/local/solrcloud/tomcat2/webapps/solr/WEB-INF/web.xml
+#solrhome路径改为/usr/local/solrcloud/solr_home2
+
+cp -r  /usr/local/solr-5.5.5/server/lib/ext/*  /usr/local/solrcloud/tomcat2/webapps/solr/WEB-INF/lib
+mkdir /usr/local/solrcloud/tomcat2/webapps/solr/WEB-INF/classpath
+cp  /usr/local/solr-5.5.5/server/resources/log4j.properties /usr/local/solrcloud/tomcat2/webapps/solr/WEB-INF/classpath
+
+#运行tomcat
+cd /usr/local/solrcloud/tomcat2/bin
+./startup.sh
+
+
+find / -name schema.xml
+
+
+--------------------------------------------------------------------------importhandler
+--------------------------------------------------------------------------importhandler
+--------------------------------------------------------------------------importhandler
+
+
+
+root      6279     1  2 14:51 pts/2    00:00:19 /usr/java/jdk1.8/bin/java -Djava.util.logging.config.file=/usr/apache-tomcat-7.0.59/conf/logging.properties -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager -Dsolr.allow.unsafe.resourceloading=true -Djava.endorsed.dirs=/usr/apache-tomcat-7.0.59/endorsed -classpath /usr/apache-tomcat-7.0.59/bin/bootstrap.jar:/usr/apache-tomcat-7.0.59/bin/tomcat-juli.jar -Dcatalina.base=/usr/apache-tomcat-7.0.59 -Dcatalina.home=/usr/apache-tomcat-7.0.59 -Djava.io.tmpdir=/usr/apache-tomcat-7.0.59/temp org.apache.catalina.startup.Bootstrap start
+root      6553     1 59 15:15 pts/1    00:00:18 /usr/java/jdk1.8/bin/java -Djava.util.logging.config.file=/usr/apache-tomcat-7.0.59/conf/logging.properties -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager -Dsolr.allow.unsafe.resourceloading=true -Djava.endorsed.dirs=/usr/apache-tomcat-7.0.59/endorsed -classpath /usr/apache-tomcat-7.0.59/bin/bootstrap.jar:/usr/apache-tomcat-7.0.59/bin/tomcat-juli.jar -Dcatalina.base=/usr/apache-tomcat-7.0.59 -Dcatalina.home=/usr/apache-tomcat-7.0.59 -Djava.io.tmpdir=/usr/apache-tomcat-7.0.59/temp org.apache.catalina.startup.Bootstrap start
+
+root      2371     1 67  2017 ?        153-16:53:00 /usr/bin/java -Djava.util.logging.config.file=/usr/local/solrcloud/solr/apache-tomcat-7.0.59/conf/logging.properties -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager -DzkHost=192.168.201.191:2181,192.168.201.192:2181,192.168.201.193:2181 -server -Xms256m -Xmx1200m -XX:PermSize=128M -XX:MaxPermSize=512M -Djava.endorsed.dirs=/usr/local/solrcloud/solr/apache-tomcat-7.0.59/endorsed -classpath /usr/local/solrcloud/solr/apache-tomcat-7.0.59/bin/bootstrap.jar:/usr/local/solrcloud/solr/apache-tomcat-7.0.59/bin/tomcat-juli.jar -Dcatalina.base=/usr/local/solrcloud/solr/apache-tomcat-7.0.59 -Dcatalina.home=/usr/local/solrcloud/solr/apache-tomcat-7.0.59 -Djava.io.tmpdir=/usr/local/solrcloud/solr/apache-tomcat-7.0.59/temp org.apache.catalina.startup.Bootstrap start
+ 
+

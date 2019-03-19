@@ -1,0 +1,24 @@
+yum list installed | grep mysql          --是否装过mysql
+装过卸载：yum -y remove mysql-libs.x86_64
+
+
+wget http://repo.mysql.com//mysql57-community-release-el7-7.noarch.rpm          --添加选择yum源
+
+yum localinstall mysql57-community-release-el7-7.noarch.rpm --nosignature
+
+yum install mysql-community-server --nosignature
+
+service mysqld start --启动
+
+grep “password” /var/log/mysqld.log   --    lxc;NrGCy5ga
+
+
+mysql -u root -p
+
+set password for root@localhost = password('123456Jy.');   --修改root密码
+
+use mysql; update user set host = '%' where user = 'root';         --修改远程能连接的主机
+service mysqld restart --重新启动
+
+
+nano /etc/my.cnf           --数据文件位置

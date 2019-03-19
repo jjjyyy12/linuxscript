@@ -1,0 +1,540 @@
+﻿curl -sSL -o dotnet.tar.gz https://go.microsoft.com/fwlink/?LinkID=809131
+
+sudo mkdir -p /opt/dotnet && sudo tar zxf dotnet.tar.gz -C /opt/dotnet
+
+sudo ln -s /opt/dotnet/dotnet /usr/local/bin
+
+dotnet --info
+
+
+rm -rf testangularjs
+
+cp -r /home/clare/桌面/testangularjs  /home/wwwroot/testangularjs
+
+dotnet /home/wwwroot/testangularjs/testangularjs.dll
+
+
+-----------------------------------------------------------------build and run，报500后这样看好些
+cp -rf  /home/clare/桌面/testcore testcore
+cd testcore
+dotnet restore
+dotnet build
+dotnet run
+
+之后http://192.168.200.129:81/Home/User
+
+
+----------------------------------------nginx
+
+curl -o  nginx.rpm http://nginx.org/packages/centos/7/noarch/RPMS/nginx-release-centos-7-0.el7.ngx.noarch.rpm
+
+
+rpm -ivh nginx.rpm
+
+yum install nginx
+
+
+systemctl start nginx
+
+systemctl enable nginx
+
+
+
+nginx -s reload  --重启nginx
+
+ps -ef | grep nginx --停掉nginx
+kill -QUIT 5198  --停掉nginx
+
+
+
+------------------------------------------------------------第二种安装nginx方法，目前用的是这种
+yum install gcc-c++ --nogpgcheck
+yum install pcre pcre-devel  
+yum install zlib zlib-devel
+yum install openssl openssl--devel
+yum -y install pcre-devel openssl openssl-devel
+
+find -name nginx  
+yum remove nginx 
+cd /usr/local  
+wget http://nginx.org/download/nginx-1.7.4.tar.gz
+ tar -zxvf nginx-1.7.4.tar.gz  
+ cd  nginx-1.7.4
+  ./configure --prefix=/usr/local/nginx
+  
+make
+make install 
+
+ whereis nginx 
+ 
+ 
+events {
+    use epoll;
+    worker_connections      51200;  # Maxclient = work_processes *　worker_connections
+ }
+http {
+
+## 用户的 IP 地址 $binary_remote_addr 作为 Key，每个 IP 地址最多有 100 个并发连接
+## 你想开 几千个连接 刷死我？ 超过 100 个连接，直接返回 503 错误给你，根本不处理你的请求了
+limit_conn_zone $binary_remote_addr zone=TotalConnLimitZone:40m ;
+limit_conn  TotalConnLimitZone  200;
+limit_conn_log_level notice;
+
+## 用户的 IP 地址 $binary_remote_addr 作为 Key，每个 IP 地址每秒处理 40 个请求
+## 你想用程序每秒几百次的刷我，没戏，再快了就不处理了，直接返回 503 错误给你
+limit_req_zone $binary_remote_addr zone=ConnLimitZone:40m  rate=40r/s;
+limit_req_log_level notice;
+
+log_format  main  '$remote_addr - $remote_user [$time_local] '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$request" "$http_x_forwarded_for"';
+
+fastcgi_connect_timeout 300;
+fastcgi_send_timeout 300;
+fastcgi_read_timeout 300;
+fastcgi_buffer_size 64k; 
+fastcgi_buffers 4 64k; 
+fastcgi_busy_buffers_size 128k; 
+fastcgi_temp_file_write_size 128k; 
+        client_header_buffer_size 128k;
+        large_client_header_buffers 4 128k;
+
+
+ # Configuration of the server group
+    upstream appservers {
+        #zone appservers 64k;
+ip_hash;
+       server  10.200.11.101:80;#      weight=5;
+       server  10.200.11.102:80;#      weight=5;
+    }
+    upstream appservers_test {
+        #zone appservers 64k;
+ip_hash;
+       server  10.200.11.101:801;#	   weight=5;
+       server  10.200.11.102:801;#	   weight=5;
+    }
+
+  server {
+                listen 80;
+
+        # Location that proxies requests to the group
+        location / {
+            proxy_pass http://appservers;
+
+                #proxy_http_version 1.1;
+        #proxy_set_header Upgrade $http_upgrade;
+        #proxy_set_header Connection keep-alive;        
+		#proxy_cache_bypass $http_upgrade;
+
+        client_max_body_size 300m;
+                client_body_buffer_size 1024k;
+
+        proxy_connect_timeout 600;
+        proxy_read_timeout 600;
+        proxy_send_timeout 600;
+        proxy_buffer_size 64k;
+        proxy_buffers   4 32k;
+        proxy_busy_buffers_size 64k;
+        proxy_temp_file_write_size 64k;
+        proxy_set_header Host $host;
+        proxy_set_header X-real-ip $remote_addr;
+		
+	## 最多 20 个排队， 由于每秒处理 40 个请求 + 20个排队，你一秒最多发送 60 个请求过来，再多就直接返回 503 $
+        limit_req zone=ConnLimitZone burst=20 nodelay;
+
+	access_log /home/nginx_logs/access.log  main;
+#            health_check;
+        }
+    }
+
+server {
+          	listen 801;
+
+        # Location that proxies requests to the group
+        location / {
+            proxy_pass http://appservers_test;
+       
+        #proxy_http_version 1.1;
+        #proxy_set_header Upgrade $http_upgrade;
+        #proxy_set_header Connection keep-alive;        
+		#proxy_cache_bypass $http_upgrade;
+
+        client_max_body_size 300m;
+                client_body_buffer_size 1024k;
+
+        proxy_connect_timeout 600;
+        proxy_read_timeout 600;
+        proxy_send_timeout 600;
+        proxy_buffer_size 64k;
+        proxy_buffers   4 32k;
+        proxy_busy_buffers_size 64k;
+        proxy_temp_file_write_size 64k;
+        proxy_set_header Host $host;
+        proxy_set_header X-real-ip $remote_addr;
+
+	## 最多 20 个排队， 由于每秒处理 40 个请求 + 20个排队，你一秒最多发送 60 个请求过来，再多就直接返回 503 $
+        limit_req zone=ConnLimitZone burst=20 nodelay;
+
+        access_log  /home/nginx_logs/access_test.log  main;
+#            health_check;
+        }
+    }
+
+
+}
+
+
+--nginx 启动
+ /usr/local/nginx/sbin/nginx  -c /usr/local/nginx/conf/nginx.conf
+ /usr/local/nginx/sbin/nginx -s reload
+ 
+ --firewall时
+命令：firewall-cmd --zone=public --add-port=80/tcp --permanent（开放80端口）
+
+命令：systemctl restart firewalld（重启防火墙以使配置即时生效）
+
+
+nano /etc/nginx/conf.d/default.conf --修改端口
+
+
+ulimit -n 51200 这个方法是临时的
+nano /etc/security/limits.conf  --修改系统最大连接数
+追加：
+* soft nofile 32768
+* hard nofile 51200
+
+-----------------------------------------------------------------------nginx开机自启动：
+whereis nginx
+
+cd /etc/init.d/
+nano nginx
+
+#!/bin/bash
+# Startup script for the nginx Web Server
+# chkconfig: - 85 15
+# description: nginx is a World Wide Web server. It is used to serve
+# HTML files and CGI.
+# processname: nginx
+# pidfile: /usr/local/nginx/logs/nginx.pid
+# config: /usr/local/nginx/conf/nginx.conf
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
+export PATH
+NGINX_HOME=/usr/local/nginx/sbin
+NGINX_CONF=/usr/local/nginx/conf
+PHP_HOME=/usr/local/php-fcgi/bin
+if [ ! -f "$NGINX_HOME/nginx" ]
+then
+    echo "nginxserver startup: cannot start"
+    exit
+fi
+case "$1" in
+    'start')
+        $PHP_HOME/spawn-fcgi -a 127.0.0.1 -p 10080 -C 20 -u nobody -f $PHP_HOME/php-cgi
+        $NGINX_HOME/nginx -c $NGINX_CONF/nginx.conf
+        echo "nginx start successful"
+        ;;
+    'stop')
+        killall -TERM php-cgi
+        killall -TERM nginx
+        ;;
+esac
+
+ 
+ chmod a+x /etc/init.d/nginx
+ 
+ -----------------/etc/init.d/nginx status , /etc/init.d/nginx stop , /etc/init.d/nginx restart
+ 
+nano /etc/rc.local
+加入 /etc/init.d/nginx start
+
+chkconfig --add nginx
+
+systemctl enable nginx.service
+
+
+---------------------------------------------------------------nginx log 切割
+---------------------------------------------------------------nginx log 切割
+---------------------------------------------------------------nginx log 切割
+http://www.cnblogs.com/benio/archive/2010/10/13/1849935.html
+
+nano /usr/local/nginx/sbin/cut-log.sh
+
+#!/bin/bash
+## 零点执行该脚本
+## Nginx 日志文件所在的目录
+LOGS_PATH=/home/nginx_logs
+## 获取昨天的 yyyy-MM-dd
+YESTERDAY=$(date -d "yesterday" +%Y-%m-%d)
+## 移动文件
+mv ${LOGS_PATH}/access.log ${LOGS_PATH}/access_${YESTERDAY}.log
+## 向 Nginx 主进程发送 USR1 信号。USR1 信号是重新打开日志文件
+kill -USR1 $(cat /usr/local/nginx/logs/nginx.pid)
+sed -i  's/creditCardCode=.*[[:space:]]/creditCardCode=--/g' ${LOGS_PATH}/access_${YESTERDAY}.log
+tar -zcvf ${LOGS_PATH}/access_${YESTERDAY}.log.tar ${LOGS_PATH}/access_${YESTERDAY}.log --remove-files
+#zip ${LOGS_PATH}/access_${YESTERDAY}.log.zip ${LOGS_PATH}/access_${YESTERDAY}.log
+
+nano /etc/crontab
+加入
+59 23 * * * root /usr/local/nginx/sbin/cut-log.sh
+chmod 777 /usr/local/nginx/sbin/cut-log.sh
+
+nano /usr/local/nginx/sbin/cut-log-test.sh
+
+#!/bin/bash
+## 零点执行该脚本
+## Nginx 日志文件所在的目录
+LOGS_PATH=/home/nginx_logs
+## 获取昨天的 yyyy-MM-dd
+YESTERDAY=$(date -d "yesterday" +%Y-%m-%d)
+## 移动文件
+mv ${LOGS_PATH}/access_test.log ${LOGS_PATH}/access_test${YESTERDAY}.log
+## 向 Nginx 主进程发送 USR1 信号。USR1 信号是重新打开日志文件
+kill -USR1 $(cat /usr/local/nginx/logs/nginx.pid)
+sed -i  's/creditCardCode=.*[[:space:]]/creditCardCode=--/g' ${LOGS_PATH}/access_test${YESTERDAY}.log
+tar -zcvf ${LOGS_PATH}/access_test${YESTERDAY}.log.tar ${LOGS_PATH}/access_test${YESTERDAY}.log --remove-files
+#zip ${LOGS_PATH}/access_test${YESTERDAY}.log.zip ${LOGS_PATH}/access_test${YESTERDAY}.log
+
+nano /etc/crontab
+加入
+55 23 * * * root /usr/local/nginx/sbin/cut-log-test.sh
+chmod 777 /usr/local/nginx/sbin/cut-log-test.sh  --修改文件权限
+
+nano /var/spool/mail/root   --执行报告
+
+ -----------------------------------------------------------http 502 解决方法
+ 
+ yum install policycoreutils-python
+ 
+ sudo cat /var/log/audit/audit.log | grep nginx | grep denied | audit2allow -M mynginx
+ 
+ sudo semodule -i mynginx.pp
+ 
+
+ 
+-----------------------------------------------------------nginx add module ngx_log_if
+ -----------------------------------------------------------nginx add module ngx_log_if
+ -----------------------------------------------------------nginx add module ngx_log_if
+ cd usr/local 
+ mkdir ngx_log_if
+ cd ngx_log_if
+ rz       ----上传ngx_log_if的 4个文件
+ 
+ cd nginx-1.7.4
+ --./configure --prefix=/你的安装目录  --add-module=/第三方模块目录
+ ./configure --prefix=/usr/local/nginx  --add-module=/usr/local/ngx_log_if
+ make
+
+ /usr/local/nginx/sbin/nginx -s stop
+ cp objs/nginx /usr/local/nginx/sbin/nginx
+ --cp objs/nginx /usr/local/nginx/sbin/nginx /usr/local/nginx-1.4.1/sbin/nginx
+ 
+ 之后 nginx.conf 中加入：
+ server {
+    location / {
+        access_log_bypass_if ($status = 404); #不记录404状态的所有日志信息
+        access_log_bypass_if ($uri ~* 'creditCardCode'); #不记录uri中所有creditCardCode目录下文件的日志信息
+        access_log_bypass_if ($uri = '/index.html'); #不记录uri为/index.html的日志信息
+	access_log_bypass_if ($host ~* 'tonv.cc'); #不记录host为tonv.cc的所有日志信息
+    }
+}
+  /usr/local/nginx/sbin/nginx  -c /usr/local/nginx/conf/nginx.conf
+ /usr/local/nginx/sbin/nginx -s reload
+
+ 
+ 
+ 
+ ---------------------------------------------------------------lvs
+ ---------------------------------------------------------------lvs
+ ---------------------------------------------------------------lvs
+ 侨联：
+ 192.168.22.111
+ 192.168.22.112
+ 192.168.22.113
+  192.168.22.114
+  
+ traceroute baidu.com
+ 
+ 
+ 192.168.22.111：
+ -------------------------------ipvsadm
+  
+  lsmod |grep ip_vs
+  modprobe ip_vs
+  lsmod |grep ip_vs
+  uname -r
+  yum install libnl* libpopt*
+  yum install    popt-static 
+  
+wget http://www.linuxvirtualserver.org/software/kernel-2.6/ipvsadm-1.26.tar.gz 
+tar zxf ipvsadm-1.26.tar.gz
+cd ipvsadm-1.26
+rpm -qa | grep kernel-devel
+make && make install
+ipvsadm
+
+----------------------------------keep-alive
+wget http://www.keepalived.org/software/keepalived-1.2.16.tar.gz
+tar -zxvf keepalived-1.2.16.tar.gz
+cd keepalived-1.2.16/
+./configure
+make && make install
+
+-----------------------------------keepalived做成启动服务
+cp /usr/local/etc/rc.d/init.d/keepalived /etc/init.d/
+cp /usr/local/etc/sysconfig/keepalived /etc/sysconfig/
+mkdir /etc/keepalived/
+cp /usr/local/etc/keepalived/keepalived.conf /etc/keepalived/
+cp /usr/local/sbin/keepalived /usr/sbin/
+service keepalived restart 
+
+cp /etc/keepalived/keepalived.conf /etc/keepalived/keepalived1.conf
+
+nano /etc/keepalived/keepalived.conf
+
+! Configuration File for keepalived
+
+global_defs {
+    notification_email {
+        acassen@firewall.loc     #设置报警邮件地址，可以设置多个，每行一个。
+        failover@firewall.loc    #需开启本机的sendmail服务
+        sysadmin@firewall.loc
+    }
+    notification_email_from Alexandre.Cassen@firewall.loc  #设置邮件的发送地址
+    smtp_server 127.0.0.1      #设置smtp server地址
+    smtp_connect_timeout 30    #设置连接smtp server的超时时间
+    router_id LVS_1        #表示运行keepalived服务器的一个标识。发邮件时显示在邮件主题的信息,
+}
+
+vrrp_instance VI_1 {
+    state MASTER              #指定keepalived的角色，MASTER表示此主机是主服务器，BACKUP表示此主机是备用服务器
+    interface eno16777736     #指定HA监测网络的接口
+    virtual_router_id 51      #虚拟路由标识，这个标识是一个数字，同一个vrrp实例使用唯一的标识。即同一vrrp_instance下，MASTER和BACKUP必须是一致的
+    priority 100              #定义优先级，数字越大，优先级越高，在同一个vrrp_instance下，MASTER的优先级必须大于BACKUP的优先级
+    advert_int 1              #设定MASTER与BACKUP负载均衡器之间同步检查的时间间隔，单位是秒
+    authentication {          #设置验证类型和密码
+        auth_type PASS        #设置验证类型，主要有PASS和AH两种
+        auth_pass 1111        #设置验证密码，在同一个vrrp_instance下，MASTER与BACKUP必须使用相同的密码才能正常通信
+    }
+    virtual_ipaddress {       #设置虚拟IP地址，可以设置多个虚拟IP地址，每行一个
+        192.168.1.118 
+    }
+}
+
+virtual_server 192.168.1.118 80 {  #设置虚拟服务器，需要指定虚拟IP地址和服务端口，IP与端口之间用空格隔开
+    delay_loop 6              #设置运行情况检查时间，单位是秒
+    lb_algo rr                #设置负载调度算法，这里设置为rr，即轮询算法
+    lb_kind DR                #设置LVS实现负载均衡的机制，有NAT、TUN、DR三个模式可选
+    nat_mask 255.255.255.0 
+    persistence_timeout 0    #会话保持时间，单位是秒。这个选项对动态网页是非常有用的，为集群系统中的session共享提供了一个很好的解决方案。
+                              #有了这个会话保持功能，用户的请求会被一直分发到某个服务节点，直到超过这个会话的保持时间。
+                              #需要注意的是，这个会话保持时间是最大无响应超时时间，也就是说，用户在操作动态页面时，如果50秒内没有执行任何操作
+                              #那么接下来的操作会被分发到另外的节点，但是如果用户一直在操作动态页面，则不受50秒的时间限制
+    protocol TCP              #指定转发协议类型，有TCP和UDP两种
+
+    real_server 192.168.1.113 80 { #配置服务节点1，需要指定real server的真实IP地址和端口，IP与端口之间用空格隔开
+        weight 1              #配置服务节点的权值，权值大小用数字表示，数字越大，权值越高，设置权值大小可以为不同性能的服务器
+                              #分配不同的负载，可以为性能高的服务器设置较高的权值，而为性能较低的服务器设置相对较低的权值，这样才能合理地利用和分配系统资源
+        TCP_CHECK {           #realserver的状态检测设置部分，单位是秒
+            connect_timeout 3    #表示3秒无响应超时
+            nb_get_retry 3       #表示重试次数
+            delay_before_retry 3 #表示重试间隔
+            connect_port 80
+        } 
+    }
+    real_server 192.168.1.114 80 {
+        weight 1
+        TCP_CHECK {
+            connect_timeout 3
+            nb_get_retry 3
+            delay_before_retry 3
+            connect_port 80
+        }
+    }
+}
+
+service keepalived start
+chkconfig --add keepalived
+chkconfig keepalived on
+
+
+192.168.22.114:
+同上安装ipvsadm和keepalived
+之后上传keepalived.conf
+ sz rz
+
+nano keepalived.conf
+ state BACKUP  #把这里原先的MASTER改成BACKUP
+    priority 99   #把这里原先的100改成99
+	
+service keepalived start
+chkconfig --add keepalived
+chkconfig keepalived on
+
+
+ 192.168.22.112
+ 192.168.22.113
+在两台RS上编写以下脚本文件realserver.sh
+
+#!/bin/bash
+#description: Config realserver
+
+VIP=192.168.22.118
+
+/etc/rc.d/init.d/functions
+
+case "$1" in
+start)
+       /sbin/ifconfig lo:0 $VIP netmask 255.255.255.255 broadcast $VIP
+       /sbin/route add -host $VIP dev lo:0
+       echo "1" >/proc/sys/net/ipv4/conf/lo/arp_ignore
+       echo "2" >/proc/sys/net/ipv4/conf/lo/arp_announce
+       echo "1" >/proc/sys/net/ipv4/conf/all/arp_ignore
+       echo "2" >/proc/sys/net/ipv4/conf/all/arp_announce
+       sysctl -p >/dev/null 2>&1
+       echo "RealServer Start OK"
+       ;;
+stop)
+       /sbin/ifconfig lo:0 down
+       /sbin/route del $VIP >/dev/null 2>&1
+       echo "0" >/proc/sys/net/ipv4/conf/lo/arp_ignore
+       echo "0" >/proc/sys/net/ipv4/conf/lo/arp_announce
+       echo "0" >/proc/sys/net/ipv4/conf/all/arp_ignore
+       echo "0" >/proc/sys/net/ipv4/conf/all/arp_announce
+       echo "RealServer Stoped"
+       ;;
+*)
+       echo "Usage: $0 {start|stop}"
+       exit 1
+esac
+
+exit 0
+
+chmod 777 /etc/rc.d/init.d/functions
+
+sh realserver.sh start
+
+firewall-cmd --zone=public --add-port=8066/tcp --permanent
+systemctl restart firewalld
+
+
+顺序：
+lvs主从负载均衡器启动：
+service keepalived start
+
+real_server启动：
+sh realserver.sh start
+
+负载均衡器查看子realserver
+ipvsadm -L
+
+-------------keepalived log
+ 我们只需要修改 /etc/sysconfig/keepalived 就可以了
+把KEEPALIVED_OPTIONS="-D" 修改为KEEPALIVED_OPTIONS="-D -d -S 0"
+最后设置syslog，修改/etc/rsyslog.conf
+最后添加：
+# keepalived -S 0 
+local0.*                                                /var/log/keepalived.log
+重新启动日志
+sudo service rsyslog restart
+sudo systemctl restart rsyslog 
+

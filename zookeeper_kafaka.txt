@@ -1,0 +1,203 @@
+#######################################################zookeeper
+#######################################################zookeeper
+#######################################################zookeeper
+#http://www.cnblogs.com/luotianshuai/p/5206662.html
+115,116,117
+#java
+yum list java*
+yum -y install java-1.8.0-openjdk*
+
+#我的目录统一放在/opt下面
+#首先创建Zookeeper项目目录
+cd /opt
+mkdir zookeeper #项目目录
+mkdir zkdata #存放快照日志
+mkdir zkdatalog #存放事物日志
+
+cd /opt/zookeeper/
+wget http://mirrors.cnnic.cn/apache/zookeeper/zookeeper-3.4.9/zookeeper-3.4.9.tar.gz
+tar -zxvf zookeeper-3.4.9.tar.gz
+
+cd zookeeper-3.4.9/conf
+#cp zoo_sample.cfg zoo.cfg
+nano zoo.cfg
+
+:
+tickTime=2000
+initLimit=10
+syncLimit=5
+dataDir=/opt/zkdata
+dataLogDir=/opt/zkdatalog
+clientPort=12181
+server.1=192.168.1.115:12888:13888
+server.2=192.168.1.116:12888:13888
+server.3=192.168.1.117:12888:13888
+
+
+115:
+nano myid
+编辑内容为1
+echo "1" > /opt/zkdata/myid
+
+116:
+nano myid
+编辑内容为2
+echo "2" > /opt/zkdata/myid
+
+117:
+nano myid
+编辑内容为3
+echo "3" > /opt/zkdata/myid
+
+
+#####################################日志定时清理
+nano /opt/zookeeper/cut-log.sh
+
+加入：
+
+#!/bin/bash 
+ 
+#snapshot file dir 
+dataDir=/opt/zkdata/version-2
+#tran log dir 
+dataLogDir=/opt/zkdatalog/version-2
+
+#Leave 66 files 
+count=66 
+count=$[$count+1] 
+ls -t $dataLogDir/log.* | tail -n +$count | xargs rm -f 
+ls -t $dataDir/snapshot.* | tail -n +$count | xargs rm -f 
+
+#以上这个脚本定义了删除对应两个目录中的文件，保留最新的66个文件，可以将他写到crontab中，设置为每天凌晨2点执行一次就可以了。
+
+
+#zk log dir   del the zookeeper log
+#logDir=
+#ls -t $logDir/zookeeper.log.* | tail -n +$count | xargs rm -f
+
+
+nano /etc/crontab
+加入
+59 23 * * * root /opt/zookeeper/cut-log.sh
+chmod 777 /opt/zookeeper/cut-log.sh
+
+
+############################打开端口，3台
+nano /etc/sysconfig/iptables
+# 增加一下内容
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 12888 -j ACCEPT
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 13888 -j ACCEPT
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 12181 -j ACCEPT
+service iptables restart
+
+
+################################################################启动，3台
+#进入到Zookeeper的bin目录下
+cd /opt/zookeeper/zookeeper-3.4.9/bin
+#启动服务（3台都需要操作）
+./zkServer.sh start
+
+#检查服务器状态
+./zkServer.sh status
+
+./zkServer.sh stop
+
+#登录客户端
+./zkCli.sh -server 192.168.1.116:12181
+get /brokers/ids/0
+
+
+#######################################################kafaka
+#######################################################kafaka
+#######################################################kafaka
+
+####################3台：
+
+cd /opt/
+mkdir kafka #创建项目目录
+cd kafka
+mkdir kafkalogs #创建kafka消息目录，主要存放kafka消息
+
+#下载软件
+wget  http://apache.opencas.org/kafka/0.9.0.1/kafka_2.11-0.9.0.1.tgz
+
+#解压软件
+tar -zxvf kafka_2.11-0.9.0.1.tgz
+
+
+cd /opt/kafka/kafka_2.11-0.9.0.1/config/
+cp server.properties server_backup.properties
+rm -rf server.properties
+nano /opt/kafka/kafka_2.11-0.9.0.1/config/server.properties
+
+#当前机器在集群中的唯一标识，和zookeeper的myid性质一样
+broker.id=0
+#当前kafka对外提供服务的端口默认是9092
+port=19092
+#这个参数默认是关闭的，在0.8.1有个bug，DNS解析问题，失败率的问题。
+host.name=192.168.1.115
+#这个是borker进行网络处理的线程数
+num.network.threads=3
+#这个是borker进行I/O处理的线程数
+num.io.threads=8
+#消息存放的目录，这个目录可以配置为“，”逗号分割的表达式，上面的num.io.threads要大于这个目录的个数这个目录，如果配置多个目录，新创建的topic他把消息持久化的地方是，当前以逗号分割的目录中，那个分区数最少就放那一个
+log.dirs=/opt/kafka/kafkalogs/
+#发送缓冲区buffer大小，数据不是一下子就发送的，先回存储到缓冲区了到达一定的大小后在发送，能提高性能
+socket.send.buffer.bytes=102400
+#kafka接收缓冲区大小，当数据到达一定大小后在序列化到磁盘
+socket.receive.buffer.bytes=102400
+#这个参数是向kafka请求消息或者向kafka发送消息的请请求的最大数，这个值不能超过java的堆栈大小
+socket.request.max.bytes=104857600
+#默认的分区数，一个topic默认1个分区数
+num.partitions=1
+#默认消息的最大持久化时间，168小时，7天
+log.retention.hours=168
+#消息保存的最大值5M
+message.max.byte=5242880
+#kafka保存消息的副本数，如果一个副本失效了，另一个还可以继续提供服务
+default.replication.factor=2
+#取消息的最大直接数
+replica.fetch.max.bytes=5242880
+#这个参数是：因为kafka的消息是以追加的形式落地到文件，当超过这个值的时候，kafka会新起一个文件
+log.segment.bytes=1073741824
+#每隔300000毫秒去检查上面配置的log失效时间（log.retention.hours=168 ），到目录查看是否有过期的消息如果有，删除
+log.retention.check.interval.ms=300000
+#是否启用log压缩，一般不用启用，启用的话可以提高性能
+log.cleaner.enable=false
+#允许删除topic
+delete.topic.enable=true 
+#设置zookeeper的连接端口
+zookeeper.connect=192.168.1.115:12181,192.168.1.116:12181,192.168.1.117:12181 
+
+############################打开端口，3台
+nano /etc/sysconfig/iptables
+# 增加一下内容
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 19092 -j ACCEPT
+service iptables restart
+
+
+#################从后台启动Kafka集群（3台都需要启动）
+cd /opt/kafka/kafka_2.11-0.9.0.1/ 
+bin/kafka-server-start.sh config/server.properties
+
+jps
+
+
+#创建Topic
+bin/kafka-topics.sh --create --zookeeper 192.168.1.116:12181 --replication-factor 3 --partitions 1 --topic auth
+
+bin/kafka-topics.sh  --zookeeper 192.168.1.116:12181 --list
+#删除 http://blog.csdn.net/fengzheku/article/details/50585972
+bin/kafka-topics.sh  --delete --zookeeper 192.168.1.116:12181  --topic auth
+
+bin/kafka-topics.sh --create --zookeeper 192.168.1.116:12181 --replication-factor 3 --partitions 1 --topic authtop
+
+#查看topic内容
+bin/kafka-topics.sh --describe --zookeeper 192.168.1.116:12181 --topic authtop
+
+#创建2个broker，发布者，116自身
+bin/kafka-console-producer.sh --broker-list 192.168.1.117:19092 --topic authtop
+bin/kafka-console-producer.sh --broker-list 192.168.1.115:19092 --topic authtop
+'''在一台服务器上创建一个订阅者'''
+bin/kafka-console-consumer.sh --zookeeper 192.168.1.116:12181 --topic authtop --from-beginning
+bin/kafka-console-consumer.sh --zookeeper 192.168.1.116:12181 --topic auth.operate --from-beginning

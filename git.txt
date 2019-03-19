@@ -1,0 +1,45 @@
+git config --global user.name "jjjyyy12"
+git config --global user.email "jiaoyue2002@163.com"
+
+git clone https://github.com/jjjyyy12/Jy.git
+这个时候你的工程目录下会多出一个helloworld文件夹，把这个文件夹里的所有目录复制到上一层目录中，就能将整个工程添加到版本控制中去了 这里这里有个隐藏的.git文件，不要漏掉！！！
+
+复制完之后可以删掉helloworld目录，之后ls -al查看工程目录
+git push origin master
+ 然后就是提交到Github上面的工作了！！！
+
+先执行提交操作，然后输入 git push origin master同步
+
+注意这里要记得输入用户名和密码进行身份效验！！切记！不要以为它不动了。。
+
+
+
+jiaoyue@jiaoyue MINGW64 /d/Study/testJy/Jy-master (master)
+$ git config --global user.name "jjjyyy12"
+
+jiaoyue@jiaoyue MINGW64 /d/Study/testJy/Jy-master (master)
+$ git config --global user.email "jiaoyue2002@163.com"
+
+jiaoyue@jiaoyue MINGW64 /d/Study/testJy/Jy-master (master)
+$ git init
+Reinitialized existing Git repository in D:/Study/testJy/Jy-master/.git/
+
+jiaoyue@jiaoyue MINGW64 /d/Study/testJy/Jy-master (master)
+$ git init
+Reinitialized existing Git repository in D:/Study/testJy/Jy-master/.git/
+
+jiaoyue@jiaoyue MINGW64 /d/Study/testJy/Jy-master (master)
+$ git add .
+jiaoyue@jiaoyue MINGW64 /d/Study/testJy/Jy-master (master)
+$ git commit -m "first init"
+
+jiaoyue@jiaoyue MINGW64 /d/Study/testJy/Jy-master (master)
+$ git remote add origin https://github.com/jjjyyy12/Jy.git
+jiaoyue@jiaoyue MINGW64 /d/Study/testJy/Jy-master (master)
+$ git push origin master
+
+
+
+
+
+git clone https://github.com/jjjyyy12/background

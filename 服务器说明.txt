@@ -1,0 +1,39 @@
+家：
+192.168.1.111	centos7x64   主，有nginx，redis集群，lvs1+keepalived
+192.168.1.112	centos764_2  lvs2+keepalived，有nginx
+192.168.1.113	centos764_3		nginx real server1
+192.168.1.114	centos764_4     nginx real server2
+
+192.168.1.115	centos764_DB1   mysql master，rabbitmq1,kafka1,zookeeper1
+192.168.1.116	centos764_DB2   mysql slave，rabbitmq2,kafka2,zookeeper2
+192.168.1.117	centos764_DB3   mysql slave,kafka3,zookeeper3
+192.168.1.118	centos764_DBMGR   mha manager
+
+
+chengxin：
+172.16.32.98	centos 7 x64   主，有nginx，lvs1+keepalived
+172.16.32.116	centos64-2  nginx real server2
+172.16.32.183	centos64-3	nginx real server1
+172.16.32.186	centos64-4      lvs2+keepalived， nginx
+172.16.32.184	CentOS64-Cache	redis集群 
+172.16.32.187	centos764_DB1   mysql master ，rabbitmq1,kafka1,zookeeper1
+172.16.32.188	centos764_DB2   mysql slave，rabbitmq2,kafka2,zookeeper2
+172.16.32.190	centos764_DB3   mysql slave,kafka3,zookeeper3
+172.16.32.192	centos764_DBMGR   mha manager
+
+
+http://blog.csdn.net/superbfly/article/details/52162214
+192.168.66.121 主机外网ip
+192.168.136.2 桥接vmnet8 dns
+zhilian：
+192.168.136.101	centos 7 x64	主，有nginx，lvs1+keepalived
+192.168.136.102	centos64-2  nginx real server2
+192.168.136.103	centos64-3	nginx real server1
+192.168.136.111	CentOS64-Cache	redis
+192.168.136.112	centos764_DB1	mysql master ，rabbitmq1,kafka1,zookeeper1
+192.168.136.113	centos764_DB2   mysql slave，rabbitmq2,kafka2,zookeeper2
+
+
+/usr/rabbitmq/sbin/rabbitmq-server -detached
+/opt/zookeeper/zookeeper-3.4.9/bin/zkServer.sh start
+/opt/kafka/kafka_2.11-0.9.0.1/bin/kafka-server-start.sh /opt/kafka/kafka_2.11-0.9.0.1/config/server.properties

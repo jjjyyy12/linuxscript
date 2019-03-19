@@ -1,0 +1,79 @@
+
+events {
+    use epoll;
+    worker_connections      51200;  # Maxclient = work_processes *　worker_connections
+ }
+http {
+
+## 用户的 IP 地址 $binary_remote_addr 作为 Key，每个 IP 地址最多有 100 个并发连接
+## 你想开 几千个连接 刷死我？ 超过 100 个连接，直接返回 503 错误给你，根本不处理你的请求了
+limit_conn_zone $binary_remote_addr zone=TotalConnLimitZone:20m ;
+limit_conn  TotalConnLimitZone  100;
+limit_conn_log_level notice;
+
+## 用户的 IP 地址 $binary_remote_addr 作为 Key，每个 IP 地址每秒处理 20 个请求
+## 你想用程序每秒几百次的刷我，没戏，再快了就不处理了，直接返回 503 错误给你
+limit_req_zone $binary_remote_addr zone=ConnLimitZone:20m  rate=20r/s;
+limit_req_log_level notice;
+
+log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+
+ # Configuration of the server group
+    upstream appservers {
+        #zone appservers 64k;
+ip_hash;
+       server  10.30.2.175:80;#      weight=5;
+       server  10.30.2.176:80 ;#     weight=5;
+    }
+    upstream appservers_test {
+        #zone appservers 64k;
+ip_hash;
+       server  10.30.2.175:801  ;#    weight=5;
+       server  10.30.2.176:801  ;#   weight=5;
+    }
+
+  server {
+                listen 80;
+
+        # Location that proxies requests to the group
+        location / {
+            proxy_pass http://appservers;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection keep-alive;
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        
+	## 最多 10 个排队， 由于每秒处理 20 个请求 + 10个排队，你一秒最多发送 30 个请求过来，再多就直接返回 503 $
+        limit_req zone=ConnLimitZone burst=10 nodelay;
+
+	access_log  logs/access.log  main;
+#            health_check;
+        }
+  }
+
+  server {
+                listen 801;
+
+        # Location that proxies requests to the group
+        location / {
+            proxy_pass http://appservers_test;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection keep-alive;
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        
+	## 最多 10 个排队， 由于每秒处理 20 个请求 + 10个排队，你一秒最多发送 30 个请求过来，再多就直接返回 503 $
+        limit_req zone=ConnLimitZone burst=10 nodelay;
+
+	access_log  logs/access_test.log  main;
+#            health_check;
+        }
+
+    }
+}
+

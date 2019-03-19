@@ -1,0 +1,59 @@
+cd /usr/local
+
+wget https://mirrors.tuna.tsinghua.edu.cn/apache/tomcat/tomcat-8/v8.0.47/bin/apache-tomcat-8.0.47.tar.gz
+tar zvxf apache-tomcat-8.0.47.tar.gz
+mkdir solrcloud
+cd solrcloud
+mkdir tomcat1
+mkdir tomcat2
+
+cp -ri /usr/local/apache-tomcat-8.0.47/* /usr/local/solrcloud/tomcat1/
+cp -ri /usr/local/apache-tomcat-8.0.47/* /usr/local/solrcloud/tomcat2/
+
+nano /usr/local/solrcloud/tomcat1/conf/server.xml  
+#修改端口为8081
+
+nano /usr/local/solrcloud/tomcat2/conf/server.xml  
+#修改端口为8082
+
+cd /usr/local
+ wget http://mirrors.hust.edu.cn/apache/lucene/solr/5.5.5/solr-5.5.5.tgz
+ tar zxvf solr-5.5.5.tgz
+ 
+ ----------------------------------------------
+ 
+ cp -r /usr/local/solr-5.5.5/server/solr-webapp/webapp /usr/local/solrcloud/tomcat1/webapps/solr
+ cp -r /usr/local/solr-5.5.5/server/solr-webapp/webapp /usr/local/solrcloud/tomcat2/webapps/solr
+ 
+ nano /etc/sysconfig/iptables
+# 增加一下内容
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 8081 -j ACCEPT
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 8082 -j ACCEPT
+service iptables restart
+
+mkdir /usr/local/solrcloud/solr_home1
+cp -r  /usr/local/solr-5.5.5/server/solr/*  /usr/local/solrcloud/solr_home1
+nano /usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/web.xml
+#solrhome路径改为/usr/local/solrcloud/solr_home1
+
+cp -r  /usr/local/solr-5.5.5/server/lib/ext/*  /usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/lib
+mkdir /usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/classpath
+cp  /usr/local/solr-5.5.5/server/resources/log4j.properties /usr/local/solrcloud/tomcat1/webapps/solr/WEB-INF/classpath
+
+#运行tomcat
+cd /usr/local/solrcloud/tomcat1/bin
+./startup.sh
+
+
+mkdir /usr/local/solrcloud/solr_home2
+cp -r  /usr/local/solr-5.5.5/server/solr/*  /usr/local/solrcloud/solr_home2
+nano /usr/local/solrcloud/tomcat2/webapps/solr/WEB-INF/web.xml
+#solrhome路径改为/usr/local/solrcloud/solr_home2
+
+cp -r  /usr/local/solr-5.5.5/server/lib/ext/*  /usr/local/solrcloud/tomcat2/webapps/solr/WEB-INF/lib
+mkdir /usr/local/solrcloud/tomcat2/webapps/solr/WEB-INF/classpath
+cp  /usr/local/solr-5.5.5/server/resources/log4j.properties /usr/local/solrcloud/tomcat2/webapps/solr/WEB-INF/classpath
+
+#运行tomcat
+cd /usr/local/solrcloud/tomcat2/bin
+./startup.sh

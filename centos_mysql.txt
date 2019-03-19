@@ -1,0 +1,326 @@
+yum list installed | grep mysql          --是否装过mysql
+装过卸载：yum -y remove mysql-libs.x86_64
+
+
+wget http://repo.mysql.com//mysql57-community-release-el7-7.noarch.rpm          --添加选择yum源
+
+yum localinstall mysql57-community-release-el7-7.noarch.rpm --nosignature
+
+yum install mysql-community-server --nosignature
+
+service mysqld start --启动
+
+grep “password” /var/log/mysqld.log   --    lxc;NrGCy5ga
+
+
+mysql -u root -p
+
+set password for root@localhost = password('123456Jy.');   --修改root密码
+
+nano /var/lib/mysql/auto.cnf  -----datafile
+
+
+192.168.1.115
+GRANT REPLICATION SLAVE,RELOAD,SUPER ON *.* TO slave1@'192.168.1.116' IDENTIFIED BY '123456Jy.';
+GRANT REPLICATION SLAVE,RELOAD,SUPER ON *.* TO slave2@'192.168.1.117' IDENTIFIED BY '123456Jy.';
+flush  privileges;
+
+
+nano /etc/my.cnf
+加入：
+log-bin=mysql-bin #slave会基于此log-bin来做replication
+expire_logs_days=10
+max_binlog_size=100M
+server-id=1 #master的标示
+innodb_flush_log_at_trx_commit=1
+sync_binlog=1
+replicate-do-db=Orders
+log-slave-updates=1
+
+FLUSH TABLES WITH READ LOCK;
+SHOW MASTER STATUS;
+
+mysql-bin.000001
+
+ show variables like 'log_slave_updates'
+ 
+ 
+192.168.1.116
+
+nano /etc/my.cnf
+加入：
+log-bin=mysql-bin #slave会基于此log-bin来做replication
+expire_logs_days=10
+max_binlog_size=100M
+server-id=2 #slave的标示 ，10.99.123.15配置
+replicate-do-db=Orders
+log-slave-updates=1
+read_only = 1
+
+nano /var/lib/mysql/auto.cnf  -----datafile 修改uddi
+
+service mysqld restart
+
+stop slave;
+change master to master_user='slave1',master_password='123456Jy.',master_host='192.168.1.115',master_port=3306,master_log_file='mysql-bin.000004',master_log_pos=762;
+start slave;
+
+
+192.168.1.117
+
+nano /etc/my.cnf
+加入：
+log-bin=mysql-bin #slave会基于此log-bin来做replication
+expire_logs_days=10
+max_binlog_size=100M
+server-id=3 #slave的标示 ，10.99.123.15配置
+replicate-do-db=Orders
+log-slave-updates=1
+read_only = 1
+
+nano /var/lib/mysql/auto.cnf  -----datafile 修改uddi
+
+service mysqld restart
+
+stop slave;
+change master to master_user='slave2',master_password='123456Jy.',master_host='192.168.1.115',master_port=3306,master_log_file='mysql-bin.000004',master_log_pos=762;
+start slave;
+
+sHOW SLAVE STATUS
+
+------------------------------------------------------------test
+SELECT * FROM Orders.ret_order;
+/*insert into Orders.ret_order values(1,11,1,'1','1');
+
+'delete from Orders.ret_order where id<8;
+ 
+stop slave;
+change master to master_user='slave1',master_password='123456Jy.',master_host='192.168.1.115',master_port=3306,master_log_file='mysql-bin.000007',master_log_pos=2166;
+start slave;
+
+ show variables like 'log_slave_updates'
+ 
+ sHOW SLAVE STATUS
+ 
+insert into Orders.ret_order values(1,1,1,'1','1');
+SHOW MASTER STATUS;
+
+GRANT REPLICATION SLAVE,RELOAD,SUPER ON *.* TO slave1@'192.168.1.116' IDENTIFIED BY '123456Jy.';
+GRANT REPLICATION SLAVE,RELOAD,SUPER ON *.* TO slave2@'192.168.1.117' IDENTIFIED BY '123456Jy.';
+
+grant all privileges on *.* to slave1@'192.168.1.116' identified by '123456Jy.';
+grant all privileges on *.* to slave2@'192.168.1.117' identified by '123456Jy.';
+ flush privileges;
+ 
+  show variables like 'log_slave_updates'
+------------------------------------------------------------test
+
+'', '192.168.1.115', 'slave1', '3306', '60', 'mysql-bin.000004', '3109', 'jycent64-relay-bin.000002', '4', 'mysql-bin.000004', 'No', 'Yes', 'Orders', '', '', '', '', '', '0', '', '0', '3109', '154', 'None', '', '0', 'No', '', '', '', '', '', NULL, 'No', '1593', 'Fatal error: The slave I/O thread stops because master and slave have equal MySQL server UUIDs; these UUIDs must be different for replication to work.', '0', '', '', '1', '', '/var/lib/mysql/master.info', '0', NULL, 'Slave has read all relay log; waiting for more updates', '86400', '', '161015 22:31:11', '', '', '', '', '', '0', '', '', ''
+'Could not execute Write_rows event on table Orders.ret_order; Duplicate entry ''3'' for key ''PRIMARY'', Error_code: 1062; handler error HA_ERR_FOUND_DUPP_KEY; the event''s master log mysql-bin.000004, end_log_pos 1020'
+
+--------------------------------slave start 报错：
+reset master
+reset slave all
+
+
+------------------------------------------------安装半同步插件
+192.168.1.115：
+mysql -u root -p
+之后：
+install plugin rpl_semi_sync_master SONAME 'semisync_master.so';
+show variables like "%semi%";
+显示：
++-------------------------------------------+------------+
+| Variable_name                             | Value      |
++-------------------------------------------+------------+
+| rpl_semi_sync_master_enabled              | OFF        |
+| rpl_semi_sync_master_timeout              | 10000      |
+| rpl_semi_sync_master_trace_level          | 32         |
+| rpl_semi_sync_master_wait_for_slave_count | 1          |
+| rpl_semi_sync_master_wait_no_slave        | ON         |
+| rpl_semi_sync_master_wait_point           | AFTER_SYNC |
++-------------------------------------------+------------+
+
+set global rpl_semi_sync_master_enabled = 1;
+set global rpl_semi_sync_master_timeout = 1000;
+
+
+在slave上安装插件，2台：116，,117
+install plugin rpl_semi_sync_slave SONAME 'semisync_slave.so';
+show variables like "%semi%";
+set global rpl_semi_sync_slave_enabled = 1;
+stop slave; 
+start slave;  
+
+
+之后3台my.cnf
+主加入：
+rpl_semi_sync_master_enabled=1  
+rpl_semi_sync_master_timeout=1000
+从加入：
+rpl_semi_sync_slave_enabled=1
+
+
+------------------------------------------MHA
+
+192.168.1.115，116,117：
+
+yum install perl-DBD-MySQL
+
+118：
+yum install perl-DBD-MySQL
+yum install perl-Config-Tiny 
+yum -y install epel-release
+yum install perl-Log-Dispatch 
+yum install perl-Parallel-ForkManager 
+yum install -y rrdtool perl-rrdtool rrdtool-devel perl-Params-Validate
+
+rpm -ivh mha4mysql-manager-0.56-0.el6.noarch.rpm mha4mysql-node-0.56-0.el6.noarch.rpm
+
+115,116,117：
+rpm -ivh mha4mysql-node-0.56-0.el6.noarch.rpm
+
+
+118：
+mkdir -p /etc/masterha/
+mkdir -p /var/log/masterha/app1/
+
+nano /etc/masterha/app1.cnf
+加入：
+[server default] 
+manager_workdir=/var/log/masterha/app1 
+manager_log=/var/log/masterha/app1/manager.log
+user=root
+password=123456Jy. 
+ssh_user=root 
+repl_user=root 
+repl_password=123456Jy. 
+ping_interval=1 
+shutdown_script="" 
+master_ip_online_change_script="" 
+report_script=""
+
+[server1] 
+hostname=192.168.1.115
+port=3306 
+candidate_master=1 
+
+
+[server2] 
+hostname=192.168.1.116 
+port=3306 
+candidate_master=1 
+
+
+[server3]
+hostname=192.168.1.117 
+port=3306
+
+
+
+-------------------------------------ssh
+115-118分别执行：
+nano /etc/ssh/sshd_config
+
+RSAAuthentication yes # 启用RSA 认证
+PubkeyAuthentication yes # 启用公钥私钥配对认证方式
+AuthorizedKeysFile .ssh/authorized_keys # 公钥文件路径
+
+ service sshd restart
+
+118:
+ssh-keygen  -t rsa  --/root/.ssh/id_rsa
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.1.118
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.1.115
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.1.116
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.1.117
+115:
+ssh-keygen  -t rsa  --/root/.ssh/id_rsa
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.1.118
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.1.116
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.1.117
+116:
+ssh-keygen  -t rsa  --/root/.ssh/id_rsa
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.1.118
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.1.115
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.1.117
+117:
+ssh-keygen  -t rsa  --/root/.ssh/id_rsa
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.1.118
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.1.115
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.1.116
+
+118上验证： 
+ssh 192.168.1.115
+
+masterha_check_ssh --conf=/etc/masterha/app1.cnf
+masterha_check_repl --conf=/etc/masterha/app1.cnf   --可以先检查下MYSQL的复制状态
+
+--启动mha
+nohup masterha_manager --conf=/etc/masterha/app1.cnf > /tmp/mha_manager.log  2>&1 &
+
+masterha_check_status --conf=/etc/masterha/app1.cnf
+
+
+-=------------如果MHA已经进行过一次failover,MHA进程就会自动退出，之后：
+在修好的master上执行115：
+change master to master_user='slave1',master_password='123456Jy.',master_host='192.168.1.116',master_port=3306,master_log_file='mysql-bin.000001',master_log_pos=0;
+start slave;
+然后在MHA Manager主机118上执行：
+rm /var/log/masterha/app1/app1.failover.complete
+重启mha manager:
+masterha_manager --conf=/etc/masterha/app1.cnf
+这样。如果116挂掉了，将自动故障转移MASTER回到115的Mysql实例上。
+115作为slave了
+
+
+--------------------------------------------------------------------------------当主服务器故障时，人工手动调用MHA来进行故障切换操作，具体命令如下：
+先停MHA Manager:118
+ masterha_stop --conf=/etc/masterha/app1.cnf
+ 
+ 我们要手动关了主库，才能正常切换：
+ 115:
+service mysqld stop
+
+之后：
+118：
+masterha_master_switch --master_state=dead --conf=/etc/masterha/app1.cnf --dead_master_host=192.168.1.115 --dead_master_port=3306 --new_master_host=192.168.1.116 --new_master_port=3306 --ignore_last_failover
+
+
+-------------------------------------------------------MHA的在线切换
+先停MHA Manager:118
+ masterha_stop --conf=/etc/masterha/app1.cnf
+masterha_master_switch --conf=/etc/masterha/app1.cnf --master_state=alive --new_master_host=192.168.1.116 --new_master_port=3306 --orig_master_is_new_slave --running_updates_limit=10000
+
+
+
+
+
+--------------------------------------导入导出表
+115：#先到主目录mysql
+cd /var/lib/mysql/
+mysqldump -uroot -p123456Jy. Auth Users> Users.sql 
+
+http://www.cnblogs.com/yuwensong/p/3955834.html
+mysqldump -uroot -p123456Jy. -h192.168.1.115 -P3306 --routines --default-character-set=utf8 --no-create-db --no-create-info --tables Auth Users --where="host='db1'"> db.table.sql
+
+--导出库表结构和数据
+cd /var/lib/mysql/
+mysqldump -uroot -p123456Jy. Auth > Auth.sql 
+mysqldump -uroot -p123456Jy. CRM > CRM.sql 
+
+
+
+    1、导出數據库為dbname的表结构（其中用戶名為root,密码為dbpasswd,生成的脚本名為db.sql）
+    mysqldump -uroot -pdbpasswd -d dbname >db.sql;
+
+    2、导出數據库為dbname某张表(test)结构
+    mysqldump -uroot -pdbpasswd -d dbname test>db.sql;
+
+    3、导出數據库為dbname所有表结构及表數據（不加-d）
+    mysqldump -uroot -pdbpasswd  dbname >db.sql;
+
+    4、导出數據库為dbname某张表(test)结构及表數據（不加-d）
+    mysqldump -uroot -pdbpasswd dbname test>db.sql;
+	
+	
